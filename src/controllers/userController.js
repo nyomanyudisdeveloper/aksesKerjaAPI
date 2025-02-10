@@ -6,6 +6,8 @@ import dotenv from 'dotenv'
 import {getResponseInternalServerError, ResponseStatus} from '../utils/responseHelper.js'
 import { getUserByEmailService, registrationUserService } from "../model/users.js"
 
+import axios from "axios"
+
 dotenv.config()
 
 
@@ -34,6 +36,50 @@ export const registrationUserController = async (req,res) => {
         console.log("registration err = ",err)
         return res.status(500).send(getResponseInternalServerError())
         
+    }
+}
+
+export const loginUserByGmailController = async (req,res) => {
+    try{
+        const {authCode} = req.body
+
+        const response = await axios
+        .get(`https://www.googleapis.com/oauth2/v3/userinfo`, {
+            headers: {
+                Authorization: `Bearer ${authCode}`,
+                Accept: 'application/json'
+            }
+        })
+
+        const {email,email_verified,family_name,given_name,name,picture} = response.data
+
+        var user = await getUserByEmailService(email)
+
+        if(!user){
+            user = await registrationUserService(email,name)
+        }
+
+        const token = jwt.sign({
+            userID:user.id,
+            email:user.email
+        },process.env.JWT_SECRET_KEY,{
+            expiresIn:'12h'
+        })
+
+        // await updateMembershipLimitLoginService(0,membership.id)
+        return res.status(200).send({
+            status:ResponseStatus.SUCCESS,
+            message:"Login Sukses",
+            data:{
+                token
+            }
+        })
+
+
+    }
+    catch(err){
+        console.log("loginUserByGmailController err = ",err)
+        return res.status(500).send(getResponseInternalServerError())
     }
 }
 
